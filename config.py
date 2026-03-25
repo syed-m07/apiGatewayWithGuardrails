@@ -1,0 +1,5 @@
+MAX_PROMPT_LENGTH = 500
+RATE_LIMIT = 10
+RATE_WINDOW = 60  # seconds
+
+VALID_API_KEYS = ["test123", "dev456"]
