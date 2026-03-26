@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from llm_client import generate_response
 from logger import log_request
 from cache import get_cached_response, set_cached_response
+from usage import increment_usage, get_usage, estimate_cost
 import time
 import os
 
@@ -34,7 +35,10 @@ def generate(data: PromptRequest, authorization: str = Header(None)):
     # 3. Guardrails
     validate_prompt(prompt)
 
-    # 4. Caching
+    # 4. Usage Tracking
+    increment_usage(api_key, prompt)
+
+    # 5. Caching
     cached = get_cached_response(prompt)
 
     if cached:
@@ -43,16 +47,36 @@ def generate(data: PromptRequest, authorization: str = Header(None)):
 
     start = time.time()
 
-    # 5. LLM
+    # 6. LLM
     response = generate_response(prompt)
 
-    # 6. Cache store
+    # 7. Cache store
     set_cached_response(prompt, response)
 
-    # 7. Logging
+    # 8. Logging
     log_request(api_key, prompt, start)
 
     return {
         "response": response,
         "cached": False
+    }
+
+@app.get("/usage")
+def usage(authorization: str = Header(None)):
+    
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    api_key = authorization.replace("Bearer ", "").strip()
+
+    data = get_usage(api_key)
+
+    cost = estimate_cost(int(data.get(b"characters", 0)))
+
+    return {
+        "usage": {
+            "requests": int(data.get(b"requests", 0)),
+            "characters": int(data.get(b"characters", 0)),
+            "estimated_cost": cost
+        }
     }
